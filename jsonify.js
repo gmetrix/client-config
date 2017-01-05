@@ -2,7 +2,6 @@
  * Created by giova on 1/4/2017.
  */
 
-
 var fs = require("fs");
 var path = require("path");
 var l_aryArgs = process.argv.slice(2);
@@ -27,8 +26,7 @@ var lf_processArguments = function(){
 
     while (0 < l_aryArgs.length){
         l_strFlag = l_aryArgs.shift();
-        console.log(l_strFlag);
-        console.log(l_regexType.test(l_strFlag));
+
         if(l_regexDirectory.test(l_strFlag)){
             l_strDirectory = l_aryArgs.shift();
             l_outFile = l_strDirectory + '.json';
@@ -39,21 +37,18 @@ var lf_processArguments = function(){
         } else if (l_regexCompanyGuid.test(l_strFlag)) {
             l_strCompanyGuid = l_aryArgs.shift().split(',');
         } else if(l_regexHelp.test(l_strFlag)) {
-            console.log("Am I getting in here???");
-
             /*TODO: Make a hepler guide.*/
             //lf_printHelpGuide();
         } else if(l_regexType.test(l_strFlag)) {
-            console.log("I set the type here");
             l_strType = l_aryArgs.shift();
         } else {
-            console.log("Option NOT found!");
+            console.log("Flag is NOT found!");
             //lf_printHelpGuide();
         }
     }
 };
 /*
-Function that processes and concatenates file to the final json file.
+ Function that processes and concatenates file to the final json file.
  */
 var lf_processFile = function(p_strFile) {
     var l_testFile = p_strFile;
@@ -72,7 +67,6 @@ var lf_processFile = function(p_strFile) {
         l_strFileReplace = l_strFileReplace.replace(/\n/, ' ').replace(/\r/, ' ').replace(/\"/g, "\\\"");
 
         l_strContent = l_strContent.replace(/@file:.+\.(html|js)/, l_strFileReplace);
-
     }
     if ('' != l_strCompanyGuid){
         l_strContent = l_strContent.replace(/"companyId"\s*:\s*""/,'"companyId" : "' + l_strCompanyGuid + '"');
@@ -80,6 +74,11 @@ var lf_processFile = function(p_strFile) {
     l_strContent = l_strContent.replace(/\[/,"").replace(/]\s*$/, "").replace(/\r\n/g,' ').replace(/\n/g, ' ');
     return l_strContent;
 };
+/**
+ * Cycles through the page rule or business rule files and processes them
+ * @param p_oErr
+ * @param p_aryFiles
+ */
 var lf_handleForProcessFile = function(p_oErr, p_aryFiles){
 
     var l_strFinalContent = "";
@@ -92,13 +91,12 @@ var lf_handleForProcessFile = function(p_oErr, p_aryFiles){
     for(var l_dx in p_aryFiles){
         l_strTestFile = l_strDirPath + p_aryFiles[l_dx];
 
-        if("br" === l_strType && "br" === p_aryFiles[l_dx].substr(-l_strType.length)){
-            l_strFinalContent += lf_processFile(l_strTestFile) + ', ';
-        } else if("pr" === l_strType && "pr" === p_aryFiles[l_dx].substr(-l_strType.length)) {
-            console.log("I should be in here because ofblaldjlewa");
+        if( "br" === p_aryFiles[l_dx].substr(-l_strType.length) ||
+            "pr" === l_strType && "pr" === p_aryFiles[l_dx].substr(-l_strType.length)) {
             l_strFinalContent += lf_processFile(l_strTestFile) + ', ';
         }
     }
+    //here we remove the last comma, otherwise it won't be a perfect json object
     l_strFinalContent = l_strFinalContent.substr(0, l_strFinalContent.length-2);
     writer.write(l_strFinalContent);
 
