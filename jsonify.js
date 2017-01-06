@@ -15,7 +15,6 @@
  You should have received a copy of the GNU General Public License
  along with this program.  If not, see http://www.linkedin.com/giosmartinez16
  */
-
 var g_oFileSystem = require("fs");
 var l_aryArgs = process.argv.slice(2);
 var l_strDirectory     = "";
@@ -23,6 +22,7 @@ var l_outFile          = "";
 var l_aryFiles         = [];
 var l_aryExclude       = [];
 var l_strCompanyGuid;
+var l_bDoNotContinue   = false;
 var l_strType          = 'br';
 var l_regexType        = /-t|--type/;
 var l_regexDirectory   = /-d|--company-directory/;
@@ -30,6 +30,33 @@ var l_regexFile        = /-f|--files/;
 var l_regexExclude     = /-e|--exclude/;
 var l_regexCompanyGuid = /-c|--company-guid/;
 var l_regexHelp        = /\?|--help/;
+
+var lf_helpGuide = function () {
+    console.log("usage: $self [-d|--company-directory \<company directory\>] [-f|--files <comma separated list of files>] [-e|--exclude <comma separated list of files]");
+
+    console.log("This script concatenates and prepares the list of BR from a directory and puts them into a single json file.");
+
+    console.log("Required flags:");
+
+    console.log("\t-d | --company-directory \"company1\"");
+    console.log("\t\tThe name of the directory to search.   This will also be the name of the json output file.");
+
+    console.log("Optional flags:");
+    console.log("\t-f | --files \"file1,file2,file3,...\"");
+    console.log("\t\tA file or list of files separated by a comma that will be used to create the json file.");
+    console.log("\t\tIf this parameter is undefined, then all files in the directory will be used.");
+
+    console.log("\t-e | --exclude \"file1,file2,file3,...\"");
+    console.log("\t\tA file or list of files separated by a comma that will be excluded from the json file.");
+    console.log("\t\tIf this parameter is undefined, then no file will be excluded.");
+    console.log("\t-c | --company-guid \"GUID\"");
+    console.log("\t\tAn id used to dynamically allocate companyId to all of the json objects.");
+
+    console.log("-? | --help");
+    console.log("Print this help text");
+
+};
+
 /**
  * Function processes the arguments provided by the command line interface.
  */
@@ -42,7 +69,7 @@ var lf_processArguments = function(){
 
         if (l_regexDirectory.test(l_strArg)){
             l_strDirectory = l_aryArgs.shift();
-            l_strDirectory = (-1 !== l_strDirectory.indexOf('/'))? l_strDirectory : l_strDirectory + '/';
+            l_strDirectory = ('/' == l_strDirectory.charAt(l_strDirectory.length - 1))? l_strDirectory : l_strDirectory + '/';
             l_outFile = l_strDirectory.substr(0, l_strDirectory.length - 1) + '.json';
         } else if (l_regexFile.test(l_strArg)) {
             l_aryFiles = l_aryArgs.shift().split(',');
@@ -51,13 +78,15 @@ var lf_processArguments = function(){
         } else if (l_regexCompanyGuid.test(l_strArg)) {
             l_strCompanyGuid = l_aryArgs.shift().split(',');
         } else if(l_regexHelp.test(l_strArg)) {
-            /*TODO: Make a hepler guide.*/
-            //lf_printHelpGuide();
+            lf_helpGuide();
+            l_bDoNotContinue = true;
+            break;
         } else if(l_regexType.test(l_strArg)) {
             l_strType = l_aryArgs.shift();
         } else {
-            console.log("Flag is NOT found!");
-            //lf_printHelpGuide();
+            lf_helpGuide();
+            l_bDoNotContinue = true;
+            break;
         }
     }
 };
@@ -68,6 +97,7 @@ var lf_processArguments = function(){
  */
 var lf_processFile = function(p_strFile) {
     var l_strProcessedContent;
+    var l_arySplitContent;
     var l_testFile = p_strFile;
     if(0 < l_aryExclude) {
         for (var e in l_aryExclude){
@@ -124,13 +154,16 @@ var lf_handleForProcessFile = function(p_oErr, p_aryFiles){
 //2. Create a new write stream object so that we can write into the final json file
 //3. Then we process the files in a loop.
 lf_processArguments();
-var l_oWriteStream        = g_oFileSystem.createWriteStream(l_outFile);
-l_oWriteStream.write("[");
+if(!l_bDoNotContinue){
+    var l_oWriteStream        = g_oFileSystem.createWriteStream(l_outFile);
+    l_oWriteStream.write("[");
 
-//if no file here then continue into this block of code.
-if (0 >= l_aryFiles.length){
-    g_oFileSystem.readdir(l_strDirectory + '/', lf_handleForProcessFile);
+    //if there are no files provided in the arguments, then proceed reading the directory.
+    if (0 >= l_aryFiles.length){
+        g_oFileSystem.readdir(l_strDirectory + '/', lf_handleForProcessFile);
 
-} else {
-    lf_handleForProcessFile(null, l_aryFiles);
+    } else {
+        lf_handleForProcessFile(null, l_aryFiles);
+    }
 }
+
