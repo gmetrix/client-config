@@ -1,9 +1,22 @@
 /**
- * Created by giova on 1/4/2017.
+ A script used to concatenate files and build a final json object file.
+ Copyright (C) 2017  Giovanni Martinez
+
+ This program is free software: you can redistribute it and/or modify
+ it under the terms of the GNU General Public License as published by
+ the Free Software Foundation, either version 3 of the License, or
+ (at your option) any later version.
+
+ This program is distributed in the hope that it will be useful,
+ but WITHOUT ANY WARRANTY; without even the implied warranty of
+ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ GNU General Public License for more details.
+
+ You should have received a copy of the GNU General Public License
+ along with this program.  If not, see http://www.linkedin.com/giosmartinez16
  */
 
-var fs = require("fs");
-var path = require("path");
+var g_oFileSystem = require("fs");
 var l_aryArgs = process.argv.slice(2);
 var l_strDirectory     = "";
 var l_outFile          = "";
@@ -22,24 +35,25 @@ var l_regexHelp        = /\?|--help/;
  */
 var lf_processArguments = function(){
     console.log("\n *START JSONIFYING* \n");
-    var l_strFlag = "";
+    var l_strArg = "";
 
     while (0 < l_aryArgs.length){
-        l_strFlag = l_aryArgs.shift();
+        l_strArg = l_aryArgs.shift();
 
-        if(l_regexDirectory.test(l_strFlag)){
+        if (l_regexDirectory.test(l_strArg)){
             l_strDirectory = l_aryArgs.shift();
-            l_outFile = l_strDirectory + '.json';
-        } else if (l_regexFile.test(l_strFlag)) {
+            l_strDirectory = (-1 !== l_strDirectory.indexOf('/'))? l_strDirectory : l_strDirectory + '/';
+            l_outFile = l_strDirectory.substr(0, l_strDirectory.length - 1) + '.json';
+        } else if (l_regexFile.test(l_strArg)) {
             l_aryFiles = l_aryArgs.shift().split(',');
-        } else if (l_regexExclude.test(l_strFlag)) {
+        } else if (l_regexExclude.test(l_strArg)) {
             l_aryExclude = l_aryArgs.shift().split(',');
-        } else if (l_regexCompanyGuid.test(l_strFlag)) {
+        } else if (l_regexCompanyGuid.test(l_strArg)) {
             l_strCompanyGuid = l_aryArgs.shift().split(',');
-        } else if(l_regexHelp.test(l_strFlag)) {
+        } else if(l_regexHelp.test(l_strArg)) {
             /*TODO: Make a hepler guide.*/
             //lf_printHelpGuide();
-        } else if(l_regexType.test(l_strFlag)) {
+        } else if(l_regexType.test(l_strArg)) {
             l_strType = l_aryArgs.shift();
         } else {
             console.log("Flag is NOT found!");
@@ -47,10 +61,13 @@ var lf_processArguments = function(){
         }
     }
 };
-/*
- Function that processes and concatenates file to the final json file.
+/**
+ * Function that processes and concatenates file to the final json file.
+ * @param p_strFile
+ * @returns {*}
  */
 var lf_processFile = function(p_strFile) {
+    var l_strProcessedContent;
     var l_testFile = p_strFile;
     if(0 < l_aryExclude) {
         for (var e in l_aryExclude){
@@ -60,36 +77,37 @@ var lf_processFile = function(p_strFile) {
             }
         }
     }
-    var l_strContent = fs.readFileSync(l_testFile,{encoding: 'utf8'});
-    if(-1 !== l_strContent.indexOf('@file:')){
-        l_arySplitContent = l_strContent.substr(l_strContent.indexOf('@file:')+ 6).split(/"\s*,/);
-        var l_strFileReplace = fs.readFileSync(l_strDirectory + "/" + l_arySplitContent[0], {encoding: 'utf8'});
-        l_strFileReplace = l_strFileReplace.replace(/\n/, ' ').replace(/\r/, ' ').replace(/\"/g, "\\\"");
+    var l_strProcessedContent = g_oFileSystem.readFileSync(l_testFile,{encoding: 'utf8'});
 
-        l_strContent = l_strContent.replace(/@file:.+\.(html|js)/, l_strFileReplace);
+    //Here we substitute the '@file:file' flag, with actual content from a file.
+    if(-1 !== l_strProcessedContent.indexOf('@file:')){
+        l_arySplitContent = l_strProcessedContent.substr(l_strProcessedContent.indexOf('@file:')+ 6).split(/"\s*,/);
+        var l_strSubContent = g_oFileSystem.readFileSync(l_strDirectory + "/" + l_arySplitContent[0], {encoding: 'utf8'});
+        l_strSubContent = l_strSubContent.replace(/\n/, ' ').replace(/\r/, ' ').replace(/\"/g, "\\\"");
+
+        l_strProcessedContent = l_strProcessedContent.replace(/@file:.+\.(html|js)/, l_strSubContent);
     }
     if ('' != l_strCompanyGuid){
-        l_strContent = l_strContent.replace(/"companyId"\s*:\s*""/,'"companyId" : "' + l_strCompanyGuid + '"');
+        l_strProcessedContent = l_strProcessedContent.replace(/"companyId"\s*:\s*""/,'"companyId" : "' + l_strCompanyGuid + '"');
     }
-    l_strContent = l_strContent.replace(/\[/,"").replace(/]\s*$/, "").replace(/\r\n/g,' ').replace(/\n/g, ' ');
-    return l_strContent;
+    l_strProcessedContent = l_strProcessedContent.replace(/\[/,"").replace(/]\s*$/, "").replace(/\r\n/g,' ').replace(/\n/g, ' ');
+    return l_strProcessedContent;
 };
 /**
- * Cycles through the page rule or business rule files and processes them
- * @param p_oErr
- * @param p_aryFiles
+ * A callback function that cycles through the page rule or business rule files and processes them
+ * @param {Object}  p_oErr     - Error object.
+ * @param {Array}   p_aryFiles - Array of string filenames
  */
 var lf_handleForProcessFile = function(p_oErr, p_aryFiles){
-
+    //final content to be written into the json file.
     var l_strFinalContent = "";
-    var l_strDirPath      = l_strDirectory + "/";
     var l_strTestFile;
 
     if(p_oErr){
         console.log(p_oErr);
     }
     for(var l_dx in p_aryFiles){
-        l_strTestFile = l_strDirPath + p_aryFiles[l_dx];
+        l_strTestFile = l_strDirectory + p_aryFiles[l_dx];
 
         if( "br" === p_aryFiles[l_dx].substr(-l_strType.length) ||
             "pr" === l_strType && "pr" === p_aryFiles[l_dx].substr(-l_strType.length)) {
@@ -98,22 +116,21 @@ var lf_handleForProcessFile = function(p_oErr, p_aryFiles){
     }
     //here we remove the last comma, otherwise it won't be a perfect json object
     l_strFinalContent = l_strFinalContent.substr(0, l_strFinalContent.length-2);
-    writer.write(l_strFinalContent);
+    l_oWriteStream.write(l_strFinalContent);
 
-    writer.end(']');
+    l_oWriteStream.end(']');
 };
 //1. First we grab the arguments and assign the values to some variables
 //2. Create a new write stream object so that we can write into the final json file
 //3. Then we process the files in a loop.
 lf_processArguments();
-var writer        = fs.createWriteStream(l_outFile);
-writer.write("[");
+var l_oWriteStream        = g_oFileSystem.createWriteStream(l_outFile);
+l_oWriteStream.write("[");
 
 //if no file here then continue into this block of code.
 if (0 >= l_aryFiles.length){
-    fs.readdir(l_strDirectory + '/', lf_handleForProcessFile);
+    g_oFileSystem.readdir(l_strDirectory + '/', lf_handleForProcessFile);
 
 } else {
-
     lf_handleForProcessFile(null, l_aryFiles);
 }
